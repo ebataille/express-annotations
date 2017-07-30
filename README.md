@@ -87,3 +87,10 @@ By this way you have access to the controller so if you want to manipulate some 
 
 ## handling call
 
+### GET / POST / PATCH / PUT / DELETE
+
+All the method are accessible by annotation inside your Routing class
+
+```typescript
+
+```
