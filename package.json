@@ -1,0 +1,20 @@
+{
+  "name": "express_annotations",
+  "version": "1.0.0",
+  "description": "Annotations system for espress routes",
+  "main": "test.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Express",
+    "Typescript",
+    "Annotaions"
+  ],
+  "author": "edouard bataille",
+  "license": "Apache",
+  "dependencies": {
+    "@types/express": "^4.0.36",
+    "express": "^4.15.3"
+  }
+}
