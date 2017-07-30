@@ -33,8 +33,8 @@ class AbstractExpressServer {
                     return;
                 }
                 for (let file of files) {
-                    console.log(file);
-                    require(file).run();
+                    console.log(`${process.cwd()}/${file}`);
+                    require(`${process.cwd()}/${file}`).run();
                 }
                 resolve();
             });
