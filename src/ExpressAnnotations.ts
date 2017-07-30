@@ -57,9 +57,10 @@ export interface RouterParams {
 }
 
 export interface RouteValues {
-	path: string;
+	path?: string;
 	json?: boolean;
 	status?: boolean;
+	noResponse?:boolean;
 }
 
 export function Router<T extends any, IRoute>(routeParam: RouterParams) {
@@ -99,12 +100,13 @@ function handleMethod<T extends any, IRouter> (method: string, routeValues : Rou
 		descriptor = Object.getOwnPropertyDescriptor(target, key);
 	}
 	let originalMethod = descriptor.value;
+	let metadataKey = `${METADATA_METHOD_KEY}${key}`;
+	if (!target[metadataKey]) {
+		target[metadataKey] = [];
+	}
+
 	descriptor.value = (request: Request, response: Response, next: NextFunction): Promise<any> => {
-		let metadataKey = `${METADATA_METHOD_KEY}${key}`;
 		let params = [];
-		if (!target[metadataKey]) {
-			target[metadataKey] = [];
-		}
 		for (let p of target[metadataKey]) {
 			switch (p.type) {
 				case "params":
@@ -134,7 +136,7 @@ function handleMethod<T extends any, IRouter> (method: string, routeValues : Rou
 			}
 			else if (routeValues.status) {
 				response.sendStatus(result);
-			} else {
+			} else if (!routeValues.noResponse) {
 				response.send(result);
 			}
 		}).catch((error: any) => {
@@ -143,6 +145,15 @@ function handleMethod<T extends any, IRouter> (method: string, routeValues : Rou
 	};
 	if (!target[METADATA_CLASS_KEY]) {
 		target[METADATA_CLASS_KEY] = [];
+	}
+	if (!routeValues.path) {
+		routeValues.path = `/${key}`;
+		for (let p of target[metadataKey]) {
+			if (p.type == "params") {
+				routeValues.path += `/:${p.reqName}`;
+			}
+		}
+		console.log(routeValues.path);
 	}
 	target[METADATA_CLASS_KEY].push({
 		method:method,
@@ -194,9 +205,13 @@ export function EResponse() {
 	}
 }
 
-export function param(paramName: string) {
+export function param(paramName?: string) {
 	return (target: any, key: string, index: number) => {
-		addProperty(target, key, index, "params", paramName);
+		let _paramName = paramName;
+		if (!_paramName) {
+			_paramName = getParamNames(target[key])[index];
+		}
+		addProperty(target, key, index, "params", _paramName);
 	}
 }
 
@@ -206,9 +221,13 @@ export function body() {
 	}
 }
 
-export function query(paramName: string) {
+export function query(paramName?: string) {
 	return (target: any, key: string, index: number) => {
-		addProperty(target, key, index, "query", paramName);
+		let _paramName = paramName;
+		if (!_paramName) {
+			_paramName = getParamNames(target[key])[index];
+		}
+		addProperty(target, key, index, "query", _paramName);
 	}
 }
 
@@ -224,4 +243,15 @@ function addProperty(target: any, key: string, index: number, type: string, reqN
 		target[metadataKey] = [];
 	}
 	target[metadataKey].push({index: index, reqName: reqName, type: type});
+}
+
+// https://stackoverflow.com/questions/1007981/how-to-get-function-parameter-names-values-dynamically/9924463#9924463
+function getParamNames(func : Function) {
+	let STRIP_COMMENTS = /(\/\/.*$)|(\/\*[\s\S]*?\*\/)|(\s*=[^,\)]*(('(?:\\'|[^'\r\n])*')|("(?:\\"|[^"\r\n])*"))|(\s*=[^,\)]*))/mg;
+	let ARGUMENT_NAMES = /([^\s,]+)/g;
+	let fnStr = func.toString().replace(STRIP_COMMENTS, '');
+	let result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
+	if(result === null)
+		result = [];
+	return result;
 }
