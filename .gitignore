@@ -59,4 +59,5 @@ typings/
 
 .idea
 
-*.js
+example/*.js
+src/*.js

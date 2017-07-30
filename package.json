@@ -1,6 +1,6 @@
 {
   "name": "express_annotations",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Annotations system for espress routes",
   "keywords": [
     "Express",
@@ -10,6 +10,7 @@
   "repository": "git@github.com:ebataille/express-annotaions.git",
   "author": "edouard bataille",
   "license": "Apache",
+  "types": "./dist/ExpressAnnotations.d.ts",
   "dependencies": {
     "@types/express": "^4.0.36",
     "@types/glob": "^5.0.30",

@@ -2,7 +2,7 @@ import * as express from "express";
 import * as bodyParser from "body-parser";
 import {Request, Response} from  "express-serve-static-core";
 
-import {body, ERequest, EResponse, ExpressApp, GET, IRoute, param, POST, query, Router} from "../../ExpressAnnotations";
+import {body, ERequest, EResponse, ExpressApp, GET, IRoute, param, POST, query, Router} from "../../src/ExpressAnnotations";
 
 @Router({route: "/test"})
 export class Test implements IRoute {

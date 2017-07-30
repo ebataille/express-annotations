@@ -1,4 +1,4 @@
-import {AbstractExpressServer} from "../AbstractExpressServer";
+import {AbstractExpressServer} from "../src/AbstractExpressServer";
 import bodyParser = require("body-parser");
 /**
  * Created by edoua on 30/07/2017.
