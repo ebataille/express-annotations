@@ -1,4 +1,4 @@
-# express-annotaions
+# express-annotations
 Annotation for express with typescript
 
 ## installations
@@ -11,7 +11,7 @@ npm install --save express_annotations
 
 ### With the AbstractExpressServer
 
-You only need to extends the `AbstractExpressServer`
+You only need to extend the `AbstractExpressServer`
 
 ```typescript
 
@@ -89,8 +89,208 @@ By this way you have access to the controller so if you want to manipulate some 
 
 ### GET / POST / PATCH / PUT / DELETE
 
-All the method are accessible by annotation inside your Routing class
+All the method are accessible by annotation inside your Routing class.
+All method work with promise so you need to return a promise with your result.
+You can either return a couple of header / body, an object or a status
+
+
+#### GET
 
 ```typescript
+@Router({route: "/example"})
+export class Test implements IRoute {
+  // the router is automatically set by the annotation
+  router : express.Router;
 
+  // json:true means you want express return as json
+  @GET({path:"/json", json:true})
+  private handleGet () {
+    return Promise.resolve({hello:"world !"});
+  }
+
+  // status:true means you want express return as response.sendStatus (status)
+  @GET({path:"/status", status:true})
+  private handleStatus () {
+    return Promise.resolve(200);
+  }
+
+  // no status and no json mean you send your result as it is : response.send ("Hello world")
+  @GET({path:"/plain"})
+  private handleStatus () {
+    return Promise.resolve("Hello world");
+  }
+
+  // By this way you can send custom header
+  @GET({path:"/customHeader", json:true})
+  private handleStatus () {
+    return Promise.resolve({header:{"custom-header":"hello header !"}, body:{result:"Hello world with custom headers"});
+  }
+}
 ```
+
+#### POST
+
+```typescript
+@Router({route: "/example"})
+export class Test implements IRoute {
+  // the router is automatically set by the annotation
+  router : express.Router;
+
+  ...
+
+  @POST ({path="/", json:true})
+  private handlePost (@body body : any) {
+    return Promise.resolve ({sendBody:body});
+  }
+}
+```
+
+#### PATCH
+
+```typescript
+@Router({route: "/example"})
+export class Test implements IRoute {
+  // the router is automatically set by the annotation
+  router : express.Router;
+
+  ...
+
+  @PATCH ({path="/", json:true})
+  private handlePatch (@body body : any) {
+    return Promise.resolve ({method:"patch", sendBody:body});
+  }
+}
+```
+#### PUT
+
+```typescript
+@Router({route: "/example"})
+export class Test implements IRoute {
+  // the router is automatically set by the annotation
+  router : express.Router;
+
+  ...
+
+  @PUT ({path="/", json:true})
+  private handlePut (@body body : any) {
+    return Promise.resolve ({method:"put", sendBody:body});
+  }
+}
+```
+
+#### DELETE
+
+```typescript
+@Router({route: "/example"})
+export class Test implements IRoute {
+  // the router is automatically set by the annotation
+  router : express.Router;
+
+  ...
+
+  @PUT ({path="/", json:true})
+  private handleDelete () {
+    return Promise.resolve ({method:"delete"});
+  }
+}
+```
+
+### Parameters
+
+To get headers, path params or queries you only need to annotate your method arguments
+
+```typescript
+@Router({route: "/example"})
+export class Test implements IRoute {
+  // the router is automatically set by the annotation
+  router : express.Router;
+
+  ...
+
+  @GET ({path="/:id", json:true})
+  private handleFindById (@param("id") id : string) {
+    return Promise.resolve ({method:"findById", id:id});
+  }
+
+  @GET ({path="/", json:true})
+  private handleFindByQueryId (@query("id") id : string) {
+    return Promise.resolve ({method:"findByQueryId", id:id});
+  }
+
+  @GET ({path="/byHeader", json:true})
+  private handleFindByHeaderId (@EHeader("id") id : string) {
+    return Promise.resolve ({method:"findByHeaderId", id:id});
+  }
+
+  // if no name is given all headers will be returned
+  @GET ({path="/byHeader2", json:true})
+  private handleFindByCustomProp (@EHeader() headers : any) {
+    return Promise.resolve ({method:"handleFindByCustomProp", id:headers["id"]});
+  }
+
+}
+```
+
+If you override the express request and need a property inside the request you can also need the `@custom` annotation 
+```typescript
+@Router({route: "/example"})
+export class Test implements IRoute {
+  // the router is automatically set by the annotation
+  router : express.Router;
+
+  ...
+
+  @GET ({path="/byHeader", json:true})
+  private handleFindByCustomProp (@custom("myCustomProp") myCustomProp : any) {
+    return Promise.resolve ({method:"handleFindByCustomProp", myProp:myCustomProp});
+  }
+
+}
+```
+Finaly if you want to have the orignal express Request and Response
+
+```typescript
+@Router({route: "/example"})
+export class Test implements IRoute {
+  // the router is automatically set by the annotation
+  router : express.Router;
+
+  ...
+
+  // the noResponse: true is to avoid to send response twice
+  @GET ({path="/byOldSchool", noResponse:true})
+  private handleOldSchool (@ERequest() request : Request, @EResponse() response : Response) {
+    response.json ({oldSchool:true, response:"Hello world !"});
+    return Promise.resolve ();
+  }
+}
+```
+
+### Automatic Path, Params and Query
+
+If you don't specify name or path, annotations system will automatically handle them by the method or arguments name
+
+
+```typescript
+@Router({route: "/example"})
+export class Test implements IRoute {
+  // the router is automatically set by the annotation
+  router : express.Router;
+
+  ...
+
+  // the generated path will be "<host>:<port>/example/automaticPath/:name"
+  // For example http://localhost:3000/example/automaticPath/foo?start=25
+  // will result to a call with name=foo and start = 25
+  @GET ({json:true})
+  private automaticPath (@param name:string, @query start : number) {
+    return Promise.resolve ({method:"automaticPath", name:name, start: start});
+  }
+}
+```
+
+## TODO
+
+* Add json:true to class to avoid to repeat them in all method and allow override in each method
+* Add Error Handler for global and local to a route
+

@@ -7,7 +7,7 @@
     "Typescript",
     "Annotaions"
   ],
-  "repository": "git@github.com:ebataille/express-annotaions.git",
+  "repository": "git@github.com:ebataille/express-annotations.git",
   "author": "edouard bataille",
   "license": "Apache",
   "types": "./dist/ExpressAnnotations.d.ts",
