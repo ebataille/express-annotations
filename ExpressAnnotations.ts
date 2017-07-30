@@ -120,8 +120,10 @@ function handleMethod<T extends any, IRouter> (method: string, routeValues : Rou
 					params[p.index] = response;
 					break;
 				case "body":
-					console.log ("body", request.body);
 					params[p.index] = request.body;
+					break;
+				case "custom":
+					params[p.index] = (<any>request)[p.reqName];
 					break;
 			}
 		}
@@ -168,6 +170,18 @@ export function PUT<T extends any, IRoute>(routeValues: RouteValues) {
 	}
 }
 
+export function PATCH<T extends any, IRoute>(routeValues: RouteValues) {
+	return (target: T, key: string, descriptor: TypedPropertyDescriptor<(...args: any[]) => Promise<any>>) => {
+		return handleMethod.apply(this, ["patch", routeValues, target, key, descriptor]);
+	}
+}
+
+export function DELETE<T extends any, IRoute>(routeValues: RouteValues) {
+	return (target: T, key: string, descriptor: TypedPropertyDescriptor<(...args: any[]) => Promise<any>>) => {
+		return handleMethod.apply(this, ["delete", routeValues, target, key, descriptor]);
+	}
+}
+
 export function ERequest() {
 	return (target: any, key: string, index: number) => {
 		addProperty(target, key, index, "request");
@@ -195,6 +209,12 @@ export function body() {
 export function query(paramName: string) {
 	return (target: any, key: string, index: number) => {
 		addProperty(target, key, index, "query", paramName);
+	}
+}
+
+export function custom(paramName: string) {
+	return (target: any, key: string, index: number) => {
+		addProperty(target, key, index, "custom", paramName);
 	}
 }
 
