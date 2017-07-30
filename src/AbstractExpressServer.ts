@@ -4,11 +4,12 @@
 import {ExpressApp} from "./ExpressAnnotations";
 import * as express from "express";
 import * as glob from "glob";
+import {Express} from "express-serve-static-core";
 
 export abstract class AbstractExpressServer {
 
 	@ExpressApp
-	app = express();
+	app : Express = express();
 
 	constructor (public port : number) {
 
