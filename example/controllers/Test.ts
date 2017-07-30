@@ -2,7 +2,10 @@ import * as express from "express";
 import * as bodyParser from "body-parser";
 import {Request, Response} from  "express-serve-static-core";
 
-import {body, ERequest, EResponse, ExpressApp, GET, IRoute, param, POST, query, Router} from "../../src/ExpressAnnotations";
+import {
+	body, EHeader, ERequest, EResponse, ExpressApp, GET, IRoute, param, POST, query,
+	Router
+} from "../../src/ExpressAnnotations";
 
 /*
 	This route will register at path : /test
@@ -40,6 +43,12 @@ export class Test implements IRoute {
 	@GET ({path:"/status", status:true})
 	private sendStatus () : Promise<any> {
 		return Promise.resolve(200);
+	}
+
+	@GET({json: true})
+	private getAndReturnHeader(@EHeader("custom-header") customHeader: string): Promise<any> {
+		console.log(customHeader);
+		return Promise.resolve({headers:{"response-header":customHeader}, body:{res: "Hello world"}});
 	}
 
 	/*

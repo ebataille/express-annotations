@@ -63,6 +63,11 @@ export interface RouteValues {
 	noResponse?:boolean;
 }
 
+export interface Result {
+	body:any;
+	headers?:any[];
+}
+
 export function Router<T extends any, IRoute>(routeParam: RouterParams) {
 	return (target: T) => {
 		let original = target;
@@ -95,7 +100,7 @@ export function Router<T extends any, IRoute>(routeParam: RouterParams) {
 	}
 }
 
-function handleMethod<T extends any, IRouter> (method: string, routeValues : RouteValues, target: T, key: string, descriptor: TypedPropertyDescriptor<(...args: any[]) => Promise<any>>) {
+function handleMethod<T extends any, IRouter> (method: string, routeValues : RouteValues, target: T, key: string, descriptor: TypedPropertyDescriptor<(...args: any[]) => Promise<Result|any>>) {
 	if (descriptor === undefined) {
 		descriptor = Object.getOwnPropertyDescriptor(target, key);
 	}
@@ -105,7 +110,7 @@ function handleMethod<T extends any, IRouter> (method: string, routeValues : Rou
 		target[metadataKey] = [];
 	}
 
-	descriptor.value = (request: Request, response: Response, next: NextFunction): Promise<any> => {
+	descriptor.value = (request: Request, response: Response, next: NextFunction): Promise<Result|any> => {
 		let params = [];
 		for (let p of target[metadataKey]) {
 			switch (p.type) {
@@ -124,20 +129,37 @@ function handleMethod<T extends any, IRouter> (method: string, routeValues : Rou
 				case "body":
 					params[p.index] = request.body;
 					break;
+				case "header":
+					if (p.reqName) {
+						params[p.index] = request.headers[p.reqName];
+					}
+					else {
+						params[p.index] = request.headers;
+					}
+					break;
 				case "custom":
 					params[p.index] = (<any>request)[p.reqName];
 					break;
 			}
 		}
 
-		return (<any>originalMethod).apply(this, params).then((result: any) => {
+		return (<any>originalMethod).apply(this, params).then((result: Result|any) => {
+			if (result.hasOwnProperty("headers")) {
+				let headers = result["headers"];
+				for (let prop in headers) {
+					if (headers.hasOwnProperty(prop)) {
+						console.log(prop, headers[prop]);
+						response.setHeader(prop, headers[prop]);
+					}
+				}
+			}
 			if (routeValues.json) {
-				response.json(result);
+				response.json(result ? (result.hasOwnProperty("body") ? result.body : result) : result);
 			}
 			else if (routeValues.status) {
-				response.sendStatus(result);
+				response.sendStatus(result ? (result.hasOwnProperty("body") ? result.body : result) : result);
 			} else if (!routeValues.noResponse) {
-				response.send(result);
+				response.send(result ? (result.body ? result.body : result) : result);
 			}
 		}).catch((error: any) => {
 			next(error);
@@ -202,6 +224,12 @@ export function ERequest() {
 export function EResponse() {
 	return (target: any, key: string, index: number) => {
 		addProperty(target, key, index, "response");
+	}
+}
+
+export function EHeader(paramName : string) {
+	return (target: any, key: string, index: number) => {
+		addProperty(target, key, index, "header", paramName);
 	}
 }
 
