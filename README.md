@@ -188,7 +188,7 @@ export class Test implements IRoute {
 
   ...
 
-  @PUT ({path="/", json:true})
+  @DELETE ({path="/", json:true})
   private handleDelete () {
     return Promise.resolve ({method:"delete"});
   }
