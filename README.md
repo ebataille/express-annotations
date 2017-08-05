@@ -295,8 +295,45 @@ export class Test implements IRoute {
 }
 ```
 
-## TODO
+## Error Handling
 
-* Add json:true to class to avoid to repeat them in all method and allow override in each method
-* Add Error Handler for global and local to a route
+### Route Error Handling
 
+You can ser error handler for a local router with the ```@ErrorHandler``` annotation :
+
+```typescript
+@Router({route: "/example"})
+export class Test implements IRoute {
+  // the router is automatically set by the annotation
+  router : express.Router;
+
+  ...
+
+  @ErrorHandler
+  private errorHandler (error : any, req : Request, res : Response, next : NextFunction) {
+  	console.log ("Error handling from route 'example'");
+  	res.status(500);
+  	res.json(error);
+  }
+}
+```
+
+### Global Error Handling
+
+Because the error method in express have to be set as the last use method, we only manage to add it in the helper AbstractExpressServer.\
+
+If you are using this helper you can leave the default method provided or override the method ```errorHandler```
+
+This is the default behaviour :
+```typescript
+protected errorHandler (error : any, req : Request, res : Response, next : NextFunction) {
+    let status = error.status || 500;
+    let err = error.error || error;
+    res.status(status);
+    if (typeof err == "object")
+        res.json(err);
+    else {
+        res.send(err);
+    }
+}
+```
