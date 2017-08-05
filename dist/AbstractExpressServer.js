@@ -16,29 +16,49 @@ class AbstractExpressServer {
     constructor(port) {
         this.port = port;
         this.app = express();
-    }
-    prepareApp() {
+        this.controllerLoaded = Promise.resolve();
         this.doPrepareApp();
-        return this;
     }
     listen() {
-        this.app.listen(this.port, () => this.listenHandler());
+        this.controllerLoaded.then(_ => {
+            this.app.use((error, request, result, next) => {
+                this.errorHandler(error, request, result, next);
+            });
+            this.app.listen(this.port, () => this.listenHandler());
+        });
         return this;
     }
     loadController(controllers) {
-        return new Promise((resolve, reject) => {
+        this.controllerLoaded = new Promise((resolve, reject) => {
             glob(controllers, (error, files) => {
                 if (error) {
                     reject(error);
                     return;
                 }
                 for (let file of files) {
-                    console.log(`${process.cwd()}/${file}`);
-                    require(`${process.cwd()}/${file}`).run();
+                    let module = require(`${process.cwd()}/${file}`);
+                    for (let prop in module) {
+                        if (module.hasOwnProperty(prop) && typeof module[prop] == "function") {
+                            new module[prop]();
+                        }
+                    }
                 }
                 resolve();
             });
+        }).catch(error => {
+            this.initError(error);
         });
+        return this;
+    }
+    errorHandler(error, req, res, next) {
+        let status = error.status || 500;
+        let err = error.error || error;
+        res.status(status);
+        if (typeof err == "object")
+            res.json(err);
+        else {
+            res.send(err);
+        }
     }
 }
 __decorate([

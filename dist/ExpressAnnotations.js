@@ -24,6 +24,8 @@ function ExpressApp(target, key) {
                 EA.app.use(route.path, route.router);
             }
         }
+        initClassTarget(target);
+        target[METADATA_CLASS_KEY].isServerClass = true;
     }
     if (delete target[key]) {
         Object.defineProperty(target, key, {
@@ -49,6 +51,8 @@ function Router(routeParam) {
             return new c();
         }
         let f = function (...args) {
+            initClassTarget(original.prototype);
+            original.prototype[METADATA_CLASS_KEY].defaultJson = routeParam.json;
             let res = construct(original, args);
             res.router = express.Router();
             if (!EA.app) {
@@ -57,8 +61,13 @@ function Router(routeParam) {
             else {
                 EA.app.use(routeParam.route, res.router);
             }
-            for (let subRoute of original.prototype[METADATA_CLASS_KEY]) {
+            for (let subRoute of original.prototype[METADATA_CLASS_KEY].methods) {
                 res.router[subRoute.method](subRoute.path, subRoute.value);
+            }
+            if (original.prototype[METADATA_CLASS_KEY].errorHandler) {
+                res.router.use((error, req, res, next) => {
+                    original.prototype[METADATA_CLASS_KEY].errorHandler(error, req, res, next);
+                });
             }
             return res;
         };
@@ -72,12 +81,12 @@ function handleMethod(method, routeValues, target, key, descriptor) {
         descriptor = Object.getOwnPropertyDescriptor(target, key);
     }
     let originalMethod = descriptor.value;
+    let metadataKey = `${METADATA_METHOD_KEY}${key}`;
+    if (!target[metadataKey]) {
+        target[metadataKey] = [];
+    }
     descriptor.value = (request, response, next) => {
-        let metadataKey = `${METADATA_METHOD_KEY}${key}`;
         let params = [];
-        if (!target[metadataKey]) {
-            target[metadataKey] = [];
-        }
         for (let p of target[metadataKey]) {
             switch (p.type) {
                 case "params":
@@ -95,65 +104,102 @@ function handleMethod(method, routeValues, target, key, descriptor) {
                 case "body":
                     params[p.index] = request.body;
                     break;
+                case "header":
+                    if (p.reqName) {
+                        params[p.index] = request.headers[p.reqName];
+                    }
+                    else {
+                        params[p.index] = request.headers;
+                    }
+                    break;
                 case "custom":
                     params[p.index] = request[p.reqName];
                     break;
             }
         }
         return originalMethod.apply(this, params).then((result) => {
-            if (routeValues.json) {
-                response.json(result);
+            if (result.hasOwnProperty("headers")) {
+                let headers = result["headers"];
+                for (let prop in headers) {
+                    if (headers.hasOwnProperty(prop)) {
+                        response.setHeader(prop, headers[prop]);
+                    }
+                }
             }
-            else if (routeValues.status) {
-                response.sendStatus(result);
+            if (routeValues.status) {
+                response.sendStatus(result ? (result.hasOwnProperty("body") ? result.body : result) : result);
             }
-            else {
-                response.send(result);
+            else if (routeValues.json || (target[METADATA_CLASS_KEY].defaultJson && !routeValues.noResponse)) {
+                response.json(result ? (result.hasOwnProperty("body") ? result.body : result) : result);
+            }
+            else if (!routeValues.noResponse) {
+                response.send(result ? (result.body ? result.body : result) : result);
             }
         }).catch((error) => {
             next(error);
         });
     };
-    if (!target[METADATA_CLASS_KEY]) {
-        target[METADATA_CLASS_KEY] = [];
+    initClassTarget(target);
+    if (!routeValues.path) {
+        routeValues.path = `/${key}`;
+        for (let p of target[metadataKey]) {
+            if (p.type == "params") {
+                routeValues.path += `/:${p.reqName}`;
+            }
+        }
     }
-    target[METADATA_CLASS_KEY].push({
+    target[METADATA_CLASS_KEY].methods.push({
         method: method,
         path: routeValues.path,
         value: descriptor.value
     });
     return descriptor;
 }
-function GET(routeValues) {
+function GET(routeValues = {}) {
     return (target, key, descriptor) => {
         return handleMethod.apply(this, ["get", routeValues, target, key, descriptor]);
     };
 }
 exports.GET = GET;
-function POST(routeValues) {
+function POST(routeValues = {}) {
     return (target, key, descriptor) => {
         return handleMethod.apply(this, ["post", routeValues, target, key, descriptor]);
     };
 }
 exports.POST = POST;
-function PUT(routeValues) {
+function PUT(routeValues = {}) {
     return (target, key, descriptor) => {
         return handleMethod.apply(this, ["put", routeValues, target, key, descriptor]);
     };
 }
 exports.PUT = PUT;
-function PATCH(routeValues) {
+function PATCH(routeValues = {}) {
     return (target, key, descriptor) => {
         return handleMethod.apply(this, ["patch", routeValues, target, key, descriptor]);
     };
 }
 exports.PATCH = PATCH;
-function DELETE(routeValues) {
+function DELETE(routeValues = {}) {
     return (target, key, descriptor) => {
         return handleMethod.apply(this, ["delete", routeValues, target, key, descriptor]);
     };
 }
 exports.DELETE = DELETE;
+function initClassTarget(target) {
+    if (!target[METADATA_CLASS_KEY]) {
+        target[METADATA_CLASS_KEY] = { methods: [], errorHandler: null, defaultJson: false, isServerClass: false };
+    }
+}
+function ErrorHandler(target, key) {
+    initClassTarget(target);
+    target[METADATA_CLASS_KEY].errorHandler = target[key];
+    if (target[METADATA_CLASS_KEY].isServerClass) {
+        EA.app.use((error, req, res, next) => {
+            target[METADATA_CLASS_KEY].errorHandler(error, req, res, next);
+        });
+    }
+}
+exports.ErrorHandler = ErrorHandler;
 function ERequest() {
     return (target, key, index) => {
         addProperty(target, key, index, "request");
@@ -166,9 +212,19 @@ function EResponse() {
     };
 }
 exports.EResponse = EResponse;
+function EHeader(paramName) {
+    return (target, key, index) => {
+        addProperty(target, key, index, "header", paramName);
+    };
+}
+exports.EHeader = EHeader;
 function param(paramName) {
     return (target, key, index) => {
-        addProperty(target, key, index, "params", paramName);
+        let _paramName = paramName;
+        if (!_paramName) {
+            _paramName = getParamNames(target[key])[index];
+        }
+        addProperty(target, key, index, "params", _paramName);
     };
 }
 exports.param = param;
@@ -180,7 +236,11 @@ function body() {
 exports.body = body;
 function query(paramName) {
     return (target, key, index) => {
-        addProperty(target, key, index, "query", paramName);
+        let _paramName = paramName;
+        if (!_paramName) {
+            _paramName = getParamNames(target[key])[index];
+        }
+        addProperty(target, key, index, "query", _paramName);
     };
 }
 exports.query = query;
@@ -196,4 +256,14 @@ function addProperty(target, key, index, type, reqName) {
         target[metadataKey] = [];
     }
     target[metadataKey].push({ index: index, reqName: reqName, type: type });
+}
+// https://stackoverflow.com/questions/1007981/how-to-get-function-parameter-names-values-dynamically/9924463#9924463
+function getParamNames(func) {
+    let STRIP_COMMENTS = /(\/\/.*$)|(\/\*[\s\S]*?\*\/)|(\s*=[^,\)]*(('(?:\\'|[^'\r\n])*')|("(?:\\"|[^"\r\n])*"))|(\s*=[^,\)]*))/mg;
+    let ARGUMENT_NAMES = /([^\s,]+)/g;
+    let fnStr = func.toString().replace(STRIP_COMMENTS, '');
+    let result = fnStr.slice(fnStr.indexOf('(') + 1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
+    if (result === null)
+        result = [];
+    return result;
 }
