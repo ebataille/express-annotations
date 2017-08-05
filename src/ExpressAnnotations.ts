@@ -34,6 +34,8 @@ export function ExpressApp(target: any, key: string) {
 				EA.app.use(route.path, route.router);
 			}
 		}
+		initClassTarget(target);
+		target[METADATA_CLASS_KEY].isServerClass = true;
 	}
 
 	if (delete target[key]) {
@@ -48,24 +50,26 @@ export function ExpressApp(target: any, key: string) {
 		setRoutes(_val);
 	}
 }
+
 export interface IRoute {
 	router: Router;
 }
 
 export interface RouterParams {
 	route: string;
+	json?: boolean;
 }
 
 export interface RouteValues {
 	path?: string;
 	json?: boolean;
 	status?: boolean;
-	noResponse?:boolean;
+	noResponse?: boolean;
 }
 
 export interface Result {
-	body:any;
-	headers?:any[];
+	body: any;
+	headers?: any[];
 }
 
 export function Router<T extends any, IRoute>(routeParam: RouterParams) {
@@ -81,6 +85,8 @@ export function Router<T extends any, IRoute>(routeParam: RouterParams) {
 		}
 
 		let f: any = function (...args: any[]) {
+			initClassTarget(original.prototype);
+			original.prototype[METADATA_CLASS_KEY].defaultJson = routeParam.json;
 			let res = construct(original, args);
 			res.router = express.Router();
 			if (!EA.app) {
@@ -89,8 +95,13 @@ export function Router<T extends any, IRoute>(routeParam: RouterParams) {
 			else {
 				EA.app.use(routeParam.route, res.router);
 			}
-			for (let subRoute of original.prototype[METADATA_CLASS_KEY]) {
+			for (let subRoute of original.prototype[METADATA_CLASS_KEY].methods) {
 				res.router[subRoute.method](subRoute.path, subRoute.value);
+			}
+			if (original.prototype[METADATA_CLASS_KEY].errorHandler) {
+				res.router.use((error: any, req: Request, res: Response, next: NextFunction) => {
+					original.prototype[METADATA_CLASS_KEY].errorHandler(error, req, res, next);
+				});
 			}
 			return res;
 		};
@@ -100,7 +111,7 @@ export function Router<T extends any, IRoute>(routeParam: RouterParams) {
 	}
 }
 
-function handleMethod<T extends any, IRouter> (method: string, routeValues : RouteValues, target: T, key: string, descriptor: TypedPropertyDescriptor<(...args: any[]) => Promise<Result|any>>) {
+function handleMethod<T extends any, IRouter>(method: string, routeValues: RouteValues, target: T, key: string, descriptor: TypedPropertyDescriptor<(...args: any[]) => Promise<Result | any>>) {
 	if (descriptor === undefined) {
 		descriptor = Object.getOwnPropertyDescriptor(target, key);
 	}
@@ -109,8 +120,7 @@ function handleMethod<T extends any, IRouter> (method: string, routeValues : Rou
 	if (!target[metadataKey]) {
 		target[metadataKey] = [];
 	}
-
-	descriptor.value = (request: Request, response: Response, next: NextFunction): Promise<Result|any> => {
+	descriptor.value = (request: Request, response: Response, next: NextFunction): Promise<Result | any> => {
 		let params = [];
 		for (let p of target[metadataKey]) {
 			switch (p.type) {
@@ -143,31 +153,28 @@ function handleMethod<T extends any, IRouter> (method: string, routeValues : Rou
 			}
 		}
 
-		return (<any>originalMethod).apply(this, params).then((result: Result|any) => {
+		return (<any>originalMethod).apply(this, params).then((result: Result | any) => {
 			if (result.hasOwnProperty("headers")) {
 				let headers = result["headers"];
 				for (let prop in headers) {
 					if (headers.hasOwnProperty(prop)) {
-						console.log(prop, headers[prop]);
 						response.setHeader(prop, headers[prop]);
 					}
 				}
 			}
-			if (routeValues.json) {
+			if (routeValues.status) {
+				response.sendStatus(result ? (result.hasOwnProperty("body") ? result.body : result) : result);
+			} else if (routeValues.json || (target[METADATA_CLASS_KEY].defaultJson && !routeValues.noResponse)) {
 				response.json(result ? (result.hasOwnProperty("body") ? result.body : result) : result);
 			}
-			else if (routeValues.status) {
-				response.sendStatus(result ? (result.hasOwnProperty("body") ? result.body : result) : result);
-			} else if (!routeValues.noResponse) {
+			else if (!routeValues.noResponse) {
 				response.send(result ? (result.body ? result.body : result) : result);
 			}
 		}).catch((error: any) => {
 			next(error);
 		});
 	};
-	if (!target[METADATA_CLASS_KEY]) {
-		target[METADATA_CLASS_KEY] = [];
-	}
+	initClassTarget(target);
 	if (!routeValues.path) {
 		routeValues.path = `/${key}`;
 		for (let p of target[metadataKey]) {
@@ -175,43 +182,58 @@ function handleMethod<T extends any, IRouter> (method: string, routeValues : Rou
 				routeValues.path += `/:${p.reqName}`;
 			}
 		}
-		console.log(routeValues.path);
 	}
-	target[METADATA_CLASS_KEY].push({
-		method:method,
+	target[METADATA_CLASS_KEY].methods.push({
+		method: method,
 		path: routeValues.path,
 		value: descriptor.value
 	});
 	return descriptor;
 }
 
-export function GET<T extends any, IRoute>(routeValues: RouteValues) {
+export function GET<T extends any, IRoute>(routeValues: RouteValues = {}) {
 	return (target: T, key: string, descriptor: TypedPropertyDescriptor<(...args: any[]) => Promise<any>>) => {
 		return handleMethod.apply(this, ["get", routeValues, target, key, descriptor]);
 	}
 }
 
-export function POST<T extends any, IRoute>(routeValues: RouteValues) {
+export function POST<T extends any, IRoute>(routeValues: RouteValues = {}) {
 	return (target: T, key: string, descriptor: TypedPropertyDescriptor<(...args: any[]) => Promise<any>>) => {
 		return handleMethod.apply(this, ["post", routeValues, target, key, descriptor]);
 	}
 }
 
-export function PUT<T extends any, IRoute>(routeValues: RouteValues) {
+export function PUT<T extends any, IRoute>(routeValues: RouteValues = {}) {
 	return (target: T, key: string, descriptor: TypedPropertyDescriptor<(...args: any[]) => Promise<any>>) => {
 		return handleMethod.apply(this, ["put", routeValues, target, key, descriptor]);
 	}
 }
 
-export function PATCH<T extends any, IRoute>(routeValues: RouteValues) {
+export function PATCH<T extends any, IRoute>(routeValues: RouteValues = {}) {
 	return (target: T, key: string, descriptor: TypedPropertyDescriptor<(...args: any[]) => Promise<any>>) => {
 		return handleMethod.apply(this, ["patch", routeValues, target, key, descriptor]);
 	}
 }
 
-export function DELETE<T extends any, IRoute>(routeValues: RouteValues) {
+export function DELETE<T extends any, IRoute>(routeValues: RouteValues = {}) {
 	return (target: T, key: string, descriptor: TypedPropertyDescriptor<(...args: any[]) => Promise<any>>) => {
 		return handleMethod.apply(this, ["delete", routeValues, target, key, descriptor]);
+	}
+}
+
+function initClassTarget(target: any) {
+	if (!target[METADATA_CLASS_KEY]) {
+		target[METADATA_CLASS_KEY] = {methods: [], errorHandler: null, defaultJson: false, isServerClass:false};
+	}
+}
+
+export function ErrorHandler(target : any, key : string) {
+	initClassTarget(target);
+	target[METADATA_CLASS_KEY].errorHandler = target[key];
+	if (target[METADATA_CLASS_KEY].isServerClass) {
+		EA.app.use((error : any, req : Request, res : Response, next : NextFunction) => {
+			target[METADATA_CLASS_KEY].errorHandler(error, req, res, next);
+		});
 	}
 }
 
@@ -227,7 +249,7 @@ export function EResponse() {
 	}
 }
 
-export function EHeader(paramName : string) {
+export function EHeader(paramName: string) {
 	return (target: any, key: string, index: number) => {
 		addProperty(target, key, index, "header", paramName);
 	}
@@ -274,12 +296,12 @@ function addProperty(target: any, key: string, index: number, type: string, reqN
 }
 
 // https://stackoverflow.com/questions/1007981/how-to-get-function-parameter-names-values-dynamically/9924463#9924463
-function getParamNames(func : Function) {
+function getParamNames(func: Function) {
 	let STRIP_COMMENTS = /(\/\/.*$)|(\/\*[\s\S]*?\*\/)|(\s*=[^,\)]*(('(?:\\'|[^'\r\n])*')|("(?:\\"|[^"\r\n])*"))|(\s*=[^,\)]*))/mg;
 	let ARGUMENT_NAMES = /([^\s,]+)/g;
 	let fnStr = func.toString().replace(STRIP_COMMENTS, '');
-	let result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
-	if(result === null)
+	let result = fnStr.slice(fnStr.indexOf('(') + 1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
+	if (result === null)
 		result = [];
 	return result;
 }

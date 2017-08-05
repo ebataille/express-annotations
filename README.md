@@ -31,6 +31,11 @@ export class Server extends AbstractExpressServer {
   protected listenHandler () : void {
     console.log ("Express ready");
   }	
+  
+  // called if an error happend when initializing app
+  protected initError(error: any): void {
+    console.log("Error happen !", error);
+  }
 }
 ```
 Then in a bin.ts file
@@ -43,12 +48,9 @@ let server = new Server(3000);
 
 // the method loadController is to loadControllers
 // it accepts regexp and return a native promise
-server.prepareApp().loadController("./controllers/*.js").then (_ => {
-  // all controller are loaded, we are ready to listen
-  server.listen();
-}).catch (error => {
-  console.log(error);
-});
+// Be cause the loadController method is asynchrone, the method listen will be called
+// only when all the controllers are loaded
+server.prepareApp().loadController("./controllers/*.js").listen();
 
 ```
 
@@ -85,12 +87,16 @@ export class Test implements IRoute {
 
 By this way you have access to the controller so if you want to manipulate some rules using the express router, you still can.
 
+====\
+When using the AbstractController the method loadController will try to make a new on every
+function exported in the module (Class are converted as function)
+
 ## handling call
 
 ### GET / POST / PATCH / PUT / DELETE
 
-All the method are accessible by annotation inside your Routing class.
-All method work with promise so you need to return a promise with your result.
+All the method are accessible by annotation inside your Routing class.\
+All method work with promise so you need to return a promise with your result.\
 You can either return a couple of header / body, an object or a status
 
 

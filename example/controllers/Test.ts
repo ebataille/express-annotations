@@ -1,16 +1,16 @@
 import * as express from "express";
 import * as bodyParser from "body-parser";
-import {Request, Response} from  "express-serve-static-core";
+import {NextFunction, Request, Response} from  "express-serve-static-core";
 
 import {
-	body, EHeader, ERequest, EResponse, ExpressApp, GET, IRoute, param, POST, query,
+	body, EHeader, ERequest, EResponse, ErrorHandler, ExpressApp, GET, IRoute, param, POST, query,
 	Router
 } from "../../src/ExpressAnnotations";
 
 /*
 	This route will register at path : /test
  */
-@Router({route: "/test"})
+@Router({route: "/test", json:true})
 export class Test implements IRoute {
 
 	router: express.Router;
@@ -47,14 +47,15 @@ export class Test implements IRoute {
 
 	@GET({json: true})
 	private getAndReturnHeader(@EHeader("custom-header") customHeader: string): Promise<any> {
-		console.log(customHeader);
+		if (!customHeader)
+			return Promise.reject("custom-header must be set");
 		return Promise.resolve({headers:{"response-header":customHeader}, body:{res: "Hello world"}});
 	}
 
 	/*
 		We get here id from the path and a test property from query parameter.
 	 */
-	@GET({path:"/:id/detail/", json: true})
+	@GET({path:"/:id/detail/"})
 	private findById2(@param("id") id: string, @query("test") test: string): Promise<any> {
 		return Promise.resolve({res: "Hello world", id: id, test: test});
 	}
@@ -91,11 +92,11 @@ export class Test implements IRoute {
 	private handlePost (@body() body : any) : Promise<any> {
 		return Promise.resolve({body:body, done:200});
 	}
-}
 
-/*
-	This method is mandatory if you use the AsbtractExpressServer.loadController
- */
-export function run () {
-	new Test ();
+	//@ErrorHandler
+	private errorHandler (error : any, req : Request, res : Response, next : NextFunction) {
+		console.log ("ERROR HANDLER !!!! ", error);
+		res.status(500);
+		res.json({status:500, error:error.toString()});
+	}
 }

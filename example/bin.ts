@@ -6,8 +6,4 @@ import {Server} from "./Server";
 
 let server = new Server(3000);
 
-server.prepareApp().loadController("./example/controllers/*.js").then (_ => {
-	server.listen();
-}).catch (error => {
-	console.log(error);
-});
+server.loadController("./example/controllers/*.js").listen();
