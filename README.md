@@ -320,7 +320,7 @@ export class Test implements IRoute {
 
 ### Global Error Handling
 
-Because the error method in express have to be set as the last use method, we only manage to add it in the helper AbstractExpressServer.\
+Because the error method in express have to be set as the last use method, we only manage to add it in the helper AbstractExpressServer.
 
 If you are using this helper you can leave the default method provided or override the method ```errorHandler```
 
