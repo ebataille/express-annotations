@@ -16,5 +16,6 @@
     "@types/glob": "^5.0.30",
     "express": "^4.15.3",
     "glob": "^7.1.2"
-  }
+  },
+  "files":"dist"
 }
