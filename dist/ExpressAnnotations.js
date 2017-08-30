@@ -117,7 +117,7 @@ function handleMethod(method, routeValues, target, key, descriptor) {
                     break;
             }
         }
-        return originalMethod.apply(this, params).then((result) => {
+        return originalMethod.apply(target, params).then((result) => {
             if (result.hasOwnProperty("headers")) {
                 let headers = result["headers"];
                 for (let prop in headers) {

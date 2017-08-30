@@ -1,6 +1,6 @@
 {
   "name": "express_annotations",
-  "version": "0.0.8",
+  "version": "0.1.0",
   "description": "Annotations system for espress routes",
   "keywords": [
     "Express",
@@ -16,6 +16,5 @@
     "@types/glob": "^5.0.30",
     "express": "^4.15.3",
     "glob": "^7.1.2"
-  },
-  "files":"dist"
+  }
 }

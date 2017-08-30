@@ -153,7 +153,7 @@ function handleMethod<T extends any, IRouter>(method: string, routeValues: Route
 			}
 		}
 
-		return (<any>originalMethod).apply(this, params).then((result: Result | any) => {
+		return (<any>originalMethod).apply(target, params).then((result: Result | any) => {
 			if (result.hasOwnProperty("headers")) {
 				let headers = result["headers"];
 				for (let prop in headers) {
