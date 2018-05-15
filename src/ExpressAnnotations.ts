@@ -96,7 +96,7 @@ export function Router<T extends any, IRoute>(routeParam: RouterParams) {
 				EA.app.use(routeParam.route, res.router);
 			}
 			for (let subRoute of original.prototype[METADATA_CLASS_KEY].methods) {
-				res.router[subRoute.method](subRoute.path, subRoute.value);
+				res.router[subRoute.method](subRoute.path, (req : Request, response : Response, next : NextFunction) => subRoute.value(req, response, next, res));
 			}
 			if (original.prototype[METADATA_CLASS_KEY].errorHandler) {
 				res.router.use((error: any, req: Request, res: Response, next: NextFunction) => {
@@ -120,7 +120,7 @@ function handleMethod<T extends any, IRouter>(method: string, routeValues: Route
 	if (!target[metadataKey]) {
 		target[metadataKey] = [];
 	}
-	descriptor.value = (request: Request, response: Response, next: NextFunction): Promise<Result | any> => {
+	descriptor.value = (request: Request, response: Response, next: NextFunction, objectTarget : any): Promise<Result | any> => {
 		let params = [];
 		for (let p of target[metadataKey]) {
 			switch (p.type) {
@@ -153,7 +153,7 @@ function handleMethod<T extends any, IRouter>(method: string, routeValues: Route
 			}
 		}
 
-		return (<any>originalMethod).apply(target, params).then((result: Result | any) => {
+		return (<any>originalMethod).apply(objectTarget, params).then((result: Result | any) => {
 			if (result.hasOwnProperty("headers")) {
 				let headers = result["headers"];
 				for (let prop in headers) {

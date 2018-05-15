@@ -62,7 +62,7 @@ function Router(routeParam) {
                 EA.app.use(routeParam.route, res.router);
             }
             for (let subRoute of original.prototype[METADATA_CLASS_KEY].methods) {
-                res.router[subRoute.method](subRoute.path, subRoute.value);
+                res.router[subRoute.method](subRoute.path, (req, response, next) => subRoute.value(req, response, next, res));
             }
             if (original.prototype[METADATA_CLASS_KEY].errorHandler) {
                 res.router.use((error, req, res, next) => {
@@ -85,7 +85,7 @@ function handleMethod(method, routeValues, target, key, descriptor) {
     if (!target[metadataKey]) {
         target[metadataKey] = [];
     }
-    descriptor.value = (request, response, next) => {
+    descriptor.value = (request, response, next, objectTarget) => {
         let params = [];
         for (let p of target[metadataKey]) {
             switch (p.type) {
@@ -117,7 +117,7 @@ function handleMethod(method, routeValues, target, key, descriptor) {
                     break;
             }
         }
-        return originalMethod.apply(target, params).then((result) => {
+        return originalMethod.apply(objectTarget, params).then((result) => {
             if (result.hasOwnProperty("headers")) {
                 let headers = result["headers"];
                 for (let prop in headers) {

@@ -1,11 +1,11 @@
 {
   "name": "express_annotations",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Annotations system for espress routes",
   "keywords": [
     "Express",
     "Typescript",
-    "Annotaions"
+    "Annotations"
   ],
   "repository": "git@github.com:ebataille/express-annotations.git",
   "author": "edouard bataille",
